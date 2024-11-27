@@ -11,20 +11,28 @@ from .serializers import (
     ProveedorSerializer, FacturaSerializer
 )
 
+# Obtener el modelo de usuario personalizado
 User = get_user_model()
 
+# ViewSet para la autenticación
 class AuthViewSet(viewsets.ViewSet):
+    # Permisos para cualquier usuario (público)
     permission_classes = [permissions.AllowAny]
     
+    # Acción personalizada para el inicio de sesión
     @action(detail=False, methods=['post'])
     def login(self, request):
+        # Validar los datos de entrada con el serializador de inicio de sesión
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
             try:
+                # Buscar al usuario por correo electrónico
                 user = User.objects.get(email=email)
+                # Verificar la contraseña
                 if user.check_password(password):
+                    # Generar tokens JWT
                     refresh = RefreshToken.for_user(user)
                     return Response({
                         'token': str(refresh.access_token),
@@ -32,28 +40,43 @@ class AuthViewSet(viewsets.ViewSet):
                     })
             except User.DoesNotExist:
                 pass
+        # Respuesta de error si las credenciales son inválidas
         return Response(
             {'error': 'Invalid credentials'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
+# ViewSet para gestionar clientes
 class ClienteViewSet(viewsets.ModelViewSet):
+    # Consultar todos los clientes
     queryset = Cliente.objects.all()
+    # Serializador para clientes
     serializer_class = ClienteSerializer
+    # Permisos para usuarios autenticados
     permission_classes = [permissions.IsAuthenticated]
 
+# ViewSet para gestionar proveedores
 class ProveedorViewSet(viewsets.ModelViewSet):
+    # Consultar todos los proveedores
     queryset = Proveedor.objects.all()
+    # Serializador para proveedores
     serializer_class = ProveedorSerializer
+    # Permisos para usuarios autenticados
     permission_classes = [permissions.IsAuthenticated]
 
+# ViewSet para gestionar facturas
 class FacturaViewSet(viewsets.ModelViewSet):
+    # Serializador para facturas
     serializer_class = FacturaSerializer
+    # Permisos para usuarios autenticados
     permission_classes = [permissions.IsAuthenticated]
 
+    # Método para obtener el queryset de facturas
     def get_queryset(self):
         queryset = Factura.objects.all()
+        # Filtrar por estado si se proporciona
         estado = self.request.query_params.get('estado', None)
+        # Filtrar por tipo si se proporciona
         tipo = self.request.query_params.get('tipo', None)
         
         if estado:
@@ -63,9 +86,11 @@ class FacturaViewSet(viewsets.ModelViewSet):
             
         return queryset
 
+    # Método para crear una factura asociada al usuario actual
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)
 
+    # Acción personalizada para obtener datos del dashboard
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
         today = datetime.now().date()
